@@ -1,8 +1,0 @@
-# Excluir del build de EAS
-node_modules
-.expo
-dist
-web-build
-.git
-*.md
-test_*
