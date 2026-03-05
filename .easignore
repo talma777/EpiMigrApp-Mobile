@@ -1,0 +1,5 @@
+# Excluir archivos innecesarios del build
+node_modules
+.expo
+dist
+web-build
