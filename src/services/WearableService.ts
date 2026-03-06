@@ -9,7 +9,7 @@ import AppleHealthKit, { HealthValue, HealthInputOptions } from 'react-native-he
 import { api } from './api';
 
 // ── Types ──────────────────────────────────────────────────────────────────
-export type SignalType = 'heart_rate' | 'eda' | 'hrv' | 'accelerometer' | 'SOS_TRIGGER';
+export type SignalType = 'heart_rate' | 'eda' | 'hrv' | 'sleep' | 'accelerometer' | 'SOS_TRIGGER';
 
 export interface BiometricReading {
     dataType: SignalType;
@@ -222,7 +222,11 @@ class AppleHealthAdapter implements IWearableAdapter {
 
             const permissions = {
                 permissions: {
-                    read: [AppleHealthKit.Constants.Permissions.HeartRate]
+                    read: [
+                        AppleHealthKit.Constants.Permissions.HeartRate,
+                        AppleHealthKit.Constants.Permissions.HeartRateVariability,
+                        AppleHealthKit.Constants.Permissions.SleepAnalysis
+                    ]
                 },
             } as any;
 
@@ -232,7 +236,7 @@ class AppleHealthAdapter implements IWearableAdapter {
                     reject(new Error(err));
                     return;
                 }
-                console.log('[AppleHealth] Inicializado y enlazado correctamente.');
+                console.log('[AppleHealth] Inicializado y permisos otorgados (HR, HRV, Sueño).');
                 this.connected = true;
                 resolve();
             });
@@ -250,7 +254,7 @@ class AppleHealthAdapter implements IWearableAdapter {
 
         AppleHealthKit.getHeartRateSamples(options, (err: Object, results: Array<HealthValue>) => {
             if (err) {
-                console.log('[AppleHealth] Error leyendo sensor: ', err);
+                console.log('[AppleHealth] Error leyendo sensor de Pulso: ', err);
                 return;
             }
             if (results && results.length > 0) {
@@ -259,10 +263,72 @@ class AppleHealthAdapter implements IWearableAdapter {
                     dataType: 'heart_rate',
                     value: hr,
                     unit: 'bpm',
-                    timestamp: new Date().toISOString(),
+                    timestamp: new Date(results[0].startDate).toISOString() || new Date().toISOString(),
                     source: this.source,
-                    confidence: 0.99, // Alta confianza porque viene directo de Apple Health
+                    confidence: 0.99,
                 });
+            }
+        });
+    }
+
+    private fetchHRV(callback: (reading: BiometricReading) => void) {
+        if (Platform.OS !== 'ios') return;
+
+        const options: HealthInputOptions = {
+            limit: 1,
+            ascending: false,
+        };
+
+        (AppleHealthKit as any).getHeartRateVariabilitySamples(options, (err: Object, results: Array<HealthValue>) => {
+            if (err) {
+                console.log('[AppleHealth] Error leyendo sensor de HRV: ', err);
+                return;
+            }
+            if (results && results.length > 0) {
+                const hrv = results[0].value;
+                callback({
+                    dataType: 'hrv',
+                    value: hrv, // En ms (generalmente SDNN)
+                    unit: 'ms',
+                    timestamp: new Date(results[0].startDate).toISOString() || new Date().toISOString(),
+                    source: this.source,
+                    confidence: 0.95,
+                });
+            }
+        });
+    }
+
+    private fetchSleep(callback: (reading: BiometricReading) => void) {
+         if (Platform.OS !== 'ios') return;
+         
+         const today = new Date();
+         const yesterday = new Date(today);
+         yesterday.setDate(yesterday.getDate() - 1);
+
+         const options: HealthInputOptions = {
+            startDate: yesterday.toISOString(),
+            endDate: today.toISOString(),
+            limit: 1,
+            ascending: false,
+        };
+
+        AppleHealthKit.getSleepSamples(options, (err: Object, results: Array<HealthValue>) => {
+            if (err) {
+                 console.log('[AppleHealth] Error leyendo datos de Sueño: ', err);
+                 return;
+            }
+            if (results && results.length > 0) {
+                 // Dependiendo cómo registre Da Fit, 'value' puede indicar la fase o duration
+                 // Asumimos que tomamos la duración en minutos de la última sesión
+                 const sleepMins = (new Date(results[0].endDate).getTime() - new Date(results[0].startDate).getTime()) / 60000;
+                 callback({
+                     dataType: 'sleep',
+                     value: sleepMins,
+                     unit: 'minutes',
+                     timestamp: new Date(results[0].endDate).toISOString() || new Date().toISOString(),
+                     source: this.source,
+                     confidence: 0.90,
+                 });
             }
         });
     }
@@ -271,13 +337,21 @@ class AppleHealthAdapter implements IWearableAdapter {
         if (!this.connected || this.intervalId) return;
         const ts = () => new Date().toISOString();
 
-        // Lectura inicial
+        // Lecturas iniciales
         this.fetchHeartRate(callback);
+        this.fetchHRV(callback);
+        this.fetchSleep(callback);
 
-        // Ciclo de extracción para alimentar la IA
+        // Ciclo de extracción continua (para IA)
         this.intervalId = setInterval(() => {
             if (!this.connected) return;
             this.fetchHeartRate(callback);
+            
+            // HRV y Sueño no suelen cambiar cada 5 segs, pero lo consultamos peródicamente 
+            // (idealmente esto debería ser menos frecuente, pero a fines de MVP lo mantenemos en el ciclo)
+            if (new Date().getSeconds() % 60 === 0) {
+                 this.fetchHRV(callback);
+            }
 
             // Dato sintético de conductancia para completar la matriz del modelo 
             callback({ dataType: 'eda', value: parseFloat((Math.random() * 2 + 1.2).toFixed(3)), unit: 'μS', timestamp: ts(), source: this.source, confidence: 0.5 });
