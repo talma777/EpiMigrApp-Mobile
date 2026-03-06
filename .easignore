@@ -1,23 +1,13 @@
 node_modules/
 .expo/
 dist/
-npm-debug.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-*.orig.*
-web-build/
-# macOS
-.DS_Store
-# local env files
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-# typescript
-*.tsbuildinfo
-# generated native folders
-/ios
-/android
+build/
+.git/
+android/
+ios/
+**/*.orig.*
+**/*.jks
+**/*.p8
+**/*.p12
+**/*.key
+**/*.mobileprovision
