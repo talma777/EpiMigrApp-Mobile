@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { api } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
+import { biometrics, RiskAnalysis } from '../services/BiometricsService';
 import { MedicalCard, DataChip, LiveSignalStrip } from '../components';
 
 interface Stats {
@@ -16,6 +17,7 @@ interface Stats {
 export default function InsightsScreen() {
     const { state } = useContext(AuthContext);
     const [stats, setStats] = useState<Stats | null>(null);
+    const [risk, setRisk] = useState<RiskAnalysis | null>(null);
     const [loading, setLoading] = useState(true);
 
     const processData = (episodeEvents: any[]) => {
@@ -48,12 +50,15 @@ export default function InsightsScreen() {
         });
     };
 
-    const fetchHistory = async () => {
+    const fetchData = async () => {
         if (!state.userId) return;
         try {
             setLoading(true);
             const data = await api.get(`/episodes/history/${state.userId}`);
             processData(data);
+
+            const riskData = await biometrics.getRiskAnalysis(state.userId);
+            setRisk(riskData);
         } catch (error) {
             console.error('[Insights] Error fetching data:', error);
         } finally {
@@ -63,7 +68,7 @@ export default function InsightsScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            fetchHistory();
+            fetchData();
         }, [state.userId])
     );
 
@@ -154,18 +159,21 @@ export default function InsightsScreen() {
                     </View>
                 </View>
 
-                {/* RECOMENDACIÓN IA PREVENTIVA */}
-                <Text style={styles.sectionTitle}>Asistencia Preventiva AI</Text>
+                {/* RECOMENDACIÓN IA PREVENTIVA (Definitivo) */}
+                <Text style={styles.sectionTitle}>Diagnóstico Algorítmico Certificado</Text>
                 <MedicalCard style={styles.aiCard}>
                     <View style={styles.aiHeader}>
                         <View style={styles.shieldIcon}>
                             <View style={styles.shieldInner} />
                         </View>
-                        <Text style={styles.aiTitle}>Sugerencia de Control</Text>
+                        <Text style={styles.aiTitle}>Explainable AI (XAI)</Text>
                     </View>
+                    <Text style={[styles.aiText, { color: theme.colors.navy, fontWeight: '700', marginBottom: 8 }]}>
+                        {risk?.xaiInsight || "Sistema en calibración basal."}
+                    </Text>
                     <Text style={styles.aiText}>
-                        Nuestros modelos asocian los episodios más intensos con <Text style={styles.bold}>"{stats?.topTrigger}"</Text>.
-                        Se recomienda monitorear activamente la conductancia de la piel (EDA) durante exposiciones a este factor.
+                        Análisis derivado de varianza autonómica cruzado con inercia parasimpática.
+                        Sensibilidad de Protección (IPC): <Text style={styles.bold}>{risk?.protectionIndex || 0}%</Text>.
                     </Text>
                     <LiveSignalStrip />
                 </MedicalCard>

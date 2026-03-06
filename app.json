@@ -29,7 +29,14 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "react-native-health",
+        {
+          "NSHealthShareUsageDescription": "EpiMigrApp necesita leer tu frecuencia cardíaca y datos vitales para sincronizarlos con tu expediente médico en tiempo real.",
+          "NSHealthUpdateUsageDescription": "EpiMigrApp necesita escribir datos de salud para mejorar las predicciones médicas."
+        }
+      ]
     ],
     "extra": {
       "eas": {

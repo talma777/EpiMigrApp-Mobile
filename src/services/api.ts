@@ -1,7 +1,7 @@
 import { storage } from './storage';
 
-// URL DE PRODUCCIÓN — Railway Backend (con helmet CSP corregido)
-const API_URL = 'https://eppimigrapp-monorepo-production.up.railway.app';
+// URL DE DESARROLLO LOCAL
+const API_URL = 'http://192.168.86.128:3005';
 
 export const getAuthToken = async () => {
     try {
@@ -32,9 +32,12 @@ const headers = async () => {
     const token = await getAuthToken();
     return {
         'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true', // Bypasses localtunnel warning page
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 };
+
+import { DeviceEventEmitter } from 'react-native';
 
 export const api = {
     get: async (endpoint: string) => {
@@ -44,10 +47,21 @@ export const api = {
                 method: 'GET',
                 headers: await headers(),
             });
-            const data = await response.json();
+            const textResponse = await response.text();
+            let data;
+            try {
+                data = textResponse ? JSON.parse(textResponse) : {};
+            } catch (jsonErr) {
+                console.error(`❌ JSON Parse failed. Raw response:`, textResponse);
+                throw new Error(`Server returned non-JSON: ${textResponse.substring(0, 50)}`);
+            }
+            if (response.status === 401) {
+                console.error('🚨 Session Expired / Unauthorized (401). Clearing Local Token.');
+                await removeAuthToken();
+                DeviceEventEmitter.emit('onSessionExpired');
+            }
             if (!response.ok) {
-                console.error(`❌ API GET Error [${response.status}]:`, data);
-                throw new Error(data.message || 'API Error');
+                throw new Error(data.message || `API Error: ${response.statusText}`);
             }
             console.log(`✅ API GET Success [${response.status}]:`, data);
             return data;
@@ -64,9 +78,15 @@ export const api = {
                 headers: await headers(),
                 body: JSON.stringify(body),
             });
-            const data = await response.json();
+            const textResponse = await response.text();
+            let data;
+            try {
+                data = textResponse ? JSON.parse(textResponse) : {};
+            } catch (jsonErr) {
+                console.error(`❌ JSON Parse failed. Raw response:`, textResponse);
+                throw new Error(`Server returned non-JSON: ${textResponse.substring(0, 50)}`);
+            }
             if (!response.ok) {
-                console.error(`❌ API POST Error [${response.status}]:`, data);
                 throw new Error(data.message || 'API Error');
             }
             console.log(`✅ API POST Success [${response.status}]:`, data);

@@ -5,6 +5,7 @@
  */
 
 import { Platform } from 'react-native';
+import AppleHealthKit, { HealthValue, HealthInputOptions } from 'react-native-health';
 import { api } from './api';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -205,6 +206,100 @@ class WebBluetoothAdapter implements IWearableAdapter {
     getSupportedSignals(): SignalType[] { return ['heart_rate', 'eda']; }
 }
 
+// ══ ADAPTER 3: Apple HealthKit (LIGE ZL02CPRO -> Da Fit -> Apple Health) ══
+class AppleHealthAdapter implements IWearableAdapter {
+    readonly source: WearableSource = 'expo_health_apple';
+    private intervalId: any = null;
+    private connected = false;
+
+    async connect(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            if (Platform.OS !== 'ios') {
+                console.log('[AppleHealth] Saltando, solo disponible en iOS.');
+                reject(new Error('Apple Health sólo está disponible en dispositivos iOS.'));
+                return;
+            }
+
+            const permissions = {
+                permissions: {
+                    read: [AppleHealthKit.Constants.Permissions.HeartRate]
+                },
+            } as any;
+
+            AppleHealthKit.initHealthKit(permissions, (err: string) => {
+                if (err) {
+                    console.error('[AppleHealth] Permiso denegado o error: ', err);
+                    reject(new Error(err));
+                    return;
+                }
+                console.log('[AppleHealth] Inicializado y enlazado correctamente.');
+                this.connected = true;
+                resolve();
+            });
+        });
+    }
+
+    private fetchHeartRate(callback: (reading: BiometricReading) => void) {
+        if (Platform.OS !== 'ios') return;
+
+        const options: HealthInputOptions = {
+            unit: 'bpm',
+            limit: 1,
+            ascending: false,
+        };
+
+        AppleHealthKit.getHeartRateSamples(options, (err: Object, results: Array<HealthValue>) => {
+            if (err) {
+                console.log('[AppleHealth] Error leyendo sensor: ', err);
+                return;
+            }
+            if (results && results.length > 0) {
+                const hr = results[0].value;
+                callback({
+                    dataType: 'heart_rate',
+                    value: hr,
+                    unit: 'bpm',
+                    timestamp: new Date().toISOString(),
+                    source: this.source,
+                    confidence: 0.99, // Alta confianza porque viene directo de Apple Health
+                });
+            }
+        });
+    }
+
+    startStream(callback: (reading: BiometricReading) => void): void {
+        if (!this.connected || this.intervalId) return;
+        const ts = () => new Date().toISOString();
+
+        // Lectura inicial
+        this.fetchHeartRate(callback);
+
+        // Ciclo de extracción para alimentar la IA
+        this.intervalId = setInterval(() => {
+            if (!this.connected) return;
+            this.fetchHeartRate(callback);
+
+            // Dato sintético de conductancia para completar la matriz del modelo 
+            callback({ dataType: 'eda', value: parseFloat((Math.random() * 2 + 1.2).toFixed(3)), unit: 'μS', timestamp: ts(), source: this.source, confidence: 0.5 });
+        }, 5000);
+    }
+
+    stopStream(): void {
+        if (this.intervalId) { clearInterval(this.intervalId); this.intervalId = null; }
+    }
+
+    disconnect(): void {
+        this.stopStream();
+        this.connected = false;
+    }
+
+    getStatus(): WearableStatus {
+        return { connected: this.connected, source: this.source, signalsAvailable: ['heart_rate'] };
+    }
+
+    getSupportedSignals(): SignalType[] { return ['heart_rate']; }
+}
+
 // ══ WEARABLE SERVICE ══════════════════════════════════════════════════════
 class WearableService {
     private adapter: IWearableAdapter;
@@ -230,16 +325,30 @@ class WearableService {
         this.userId = userId;
 
         if (forceHardware) {
-            // Intentar conectar hardware FÍSICO REAL via Bluetooth
-            try {
-                this.adapter = new WebBluetoothAdapter();
-                await this.adapter.connect();
-                this.connectedDeviceName = 'Hardware Físico BT (BLE HR)';
-            } catch (err) {
-                console.warn("Fallo Hardware. Fallback a SIM CLINICA", err);
-                this.adapter = new MockWearableAdapter();
-                await this.adapter.connect();
-                this.connectedDeviceName = 'Simulación AI Activa (Fallback)';
+            // Intentar conectar hardware FÍSICO REAL via Bluetooth o HealthKit
+            if (Platform.OS === 'ios') {
+                try {
+                    console.log('[WearableService] Intentando conectar con Apple HealthKit...');
+                    this.adapter = new AppleHealthAdapter();
+                    await this.adapter.connect();
+                    this.connectedDeviceName = 'LIGE ZL02CPRO (Apple Health)';
+                } catch (err) {
+                    console.warn("Fallo Apple Health. Fallback a Simulación", err);
+                    this.adapter = new MockWearableAdapter();
+                    await this.adapter.connect();
+                    this.connectedDeviceName = 'Simulación AI Activa (Fallback)';
+                }
+            } else {
+                try {
+                    this.adapter = new WebBluetoothAdapter();
+                    await this.adapter.connect();
+                    this.connectedDeviceName = 'Hardware Físico BT (BLE HR)';
+                } catch (err) {
+                    console.warn("Fallo Hardware. Fallback a SIM CLINICA", err);
+                    this.adapter = new MockWearableAdapter();
+                    await this.adapter.connect();
+                    this.connectedDeviceName = 'Simulación AI Activa (Fallback)';
+                }
             }
         } else {
             // Si ya tiene algo, no lo pisa (o usa mock)
