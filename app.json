@@ -36,6 +36,17 @@
           "NSHealthShareUsageDescription": "EpiMigrApp necesita leer tu frecuencia cardíaca y datos vitales para sincronizarlos con tu expediente médico en tiempo real.",
           "NSHealthUpdateUsageDescription": "EpiMigrApp necesita escribir datos de salud para mejorar las predicciones médicas."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "newArchEnabled": true
+          },
+          "ios": {
+            "newArchEnabled": true
+          }
+        }
       ]
     ],
     "extra": {

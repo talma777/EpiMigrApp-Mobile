@@ -51,8 +51,8 @@ class BiometricsService {
         if (onRisk) this.onRiskUpdate = onRisk;
         if (onStatus) this.onStatusChange = onStatus;
 
-        // Iniciar stream de wearable
-        await wearableService.startMonitoring(userId);
+        // Iniciar stream de wearable (Forzando Hardware Físico)
+        await wearableService.startMonitoring(userId, true);
         this.onStatusChange?.(wearableService.getStatus());
 
         // Solicitar permisos y obtener ubicación inicial

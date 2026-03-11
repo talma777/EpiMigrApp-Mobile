@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
 import { theme } from '../../theme';
 
 /**
@@ -15,16 +15,24 @@ interface DataChipProps {
     trend?: 'up' | 'down' | 'stable';
     color?: string;
     style?: ViewStyle;
+    onInfoPress?: () => void;
 }
 
 export const DataChip: React.FC<DataChipProps> = ({
-    label, value, unit, trend, color, style
+    label, value, unit, trend, color, style, onInfoPress
 }) => {
     const resolvedColor = color || theme.colors.navy;
 
     return (
         <View style={[styles.container, style]}>
-            <Text style={styles.label}>{label.toUpperCase()}</Text>
+            <View style={styles.labelRow}>
+                <Text style={styles.label}>{label.toUpperCase()}</Text>
+                {onInfoPress && (
+                    <TouchableOpacity onPress={onInfoPress} style={styles.infoIcon} activeOpacity={0.6}>
+                        <Text style={styles.infoIconText}>?</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
             <View style={styles.valueRow}>
                 <Text style={[styles.value, { color: resolvedColor }]}>{value}</Text>
                 {unit && <Text style={styles.unit}>{unit}</Text>}
@@ -50,12 +58,30 @@ const styles = StyleSheet.create({
         borderColor: theme.colors.border,
         minWidth: 100,
     },
+    labelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
     label: {
         fontSize: 10,
         fontWeight: '700',
         color: theme.colors.textMuted,
         letterSpacing: 0.8,
-        marginBottom: 6,
+    },
+    infoIcon: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: '#E2E8F0',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    infoIconText: {
+        fontSize: 9,
+        fontWeight: '900',
+        color: theme.colors.textSecondary,
     },
     valueRow: {
         flexDirection: 'row',

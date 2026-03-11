@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, TouchableOpacity, ScrollView, StatusBar, SafeAreaView, Animated, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator, TouchableOpacity, ScrollView, StatusBar, SafeAreaView, Animated, Dimensions, Modal, TouchableWithoutFeedback } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import { biometrics, RiskAnalysis } from '../services/BiometricsService';
 import { theme, backendRiskToLevel } from '../theme';
@@ -12,6 +12,7 @@ export default function HomeScreen({ navigation }: any) {
     const [analysis, setAnalysis] = useState<RiskAnalysis | null>(null);
     const [loading, setLoading] = useState(true);
     const [wearableSource, setWearableSource] = useState('—');
+    const [tooltip, setTooltip] = useState<{ title: string; content: string } | null>(null);
 
     // Animaciones de entrada
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -87,15 +88,20 @@ export default function HomeScreen({ navigation }: any) {
                             <RiskOrb riskLevel={currentLevel === 'critical' ? 'high' : currentLevel} score={ci / 100} size="lg" />
                             <View style={styles.scoreOverlay}>
                                 <Text style={styles.scoreValue}>{ci}</Text>
-                                <Text style={styles.scoreLabel}>CLINICAL INDEX</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Text style={styles.scoreLabel}>CLINICAL INDEX</Text>
+                                    <TouchableOpacity onPress={() => setTooltip({
+                                        title: 'Clinical Index (CI)',
+                                        content: 'El CI es tu termómetro neurológico.\n\n🟢 Verde (0-30): Estable.\n🟡 Amarillo (31-70): Riesgo Moderado.\n🟠 Naranja (71-89): Monitoreo Alto.\n🔴 Rojo (90-100): Alerta inminente.'
+                                    })} style={styles.darkInfoIcon}>
+                                        <Text style={styles.darkInfoText}>?</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
 
                         <Text style={styles.statusTitle}>
                             {currentLevel === 'critical' ? 'ALERTA CRÍTICA' : currentLevel === 'high' ? 'MONITOREO ALTO' : currentLevel === 'medium' ? 'RIESGO MODERADO' : 'ESTADO ESTABLE'}
-                        </Text>
-                        <Text style={styles.statusDescription}>
-                            {analysis?.xaiInsight || analysis?.explanation || 'Análisis de estabilidad neural completado.'}
                         </Text>
                     </View>
 
@@ -107,6 +113,10 @@ export default function HomeScreen({ navigation }: any) {
                             unit="%"
                             trend={ipc > 70 ? 'up' : 'down'}
                             style={{ flex: 1 }}
+                            onInfoPress={() => setTooltip({
+                                title: 'Índice de Protección Clínica',
+                                content: 'Mide qué tan protegido está tu sistema neurológico. Considera tu descanso, adherencia a medicación y hábitos recientes. Cuanto más cerca del 100%, más blindado estás frente a crisis.'
+                            })}
                         />
                         <DataChip
                             label="Prob (λ)"
@@ -114,6 +124,10 @@ export default function HomeScreen({ navigation }: any) {
                             unit=""
                             trend={lambda > 0.3 ? 'up' : 'stable'}
                             style={{ flex: 1 }}
+                            onInfoPress={() => setTooltip({
+                                title: 'Probabilidad Matemática (λ)',
+                                content: 'Es la variable algorítmica de riesgo a corto plazo calculada por la I.A. Un valor mayor a 0.3 indica que tu riesgo está creciendo aceleradamente en este momento.'
+                            })}
                         />
                         <DataChip
                             label="Estrés"
@@ -121,6 +135,10 @@ export default function HomeScreen({ navigation }: any) {
                             unit="µS"
                             trend="stable"
                             style={{ flex: 1 }}
+                            onInfoPress={() => setTooltip({
+                                title: 'Carga Alostática (Estrés)',
+                                content: 'Nivel de actividad actual de tu sistema nervioso simpático, inferido de tu biometría. Valores altos constantes revelan estrés fisiológico que desgasta tu blindaje.'
+                            })}
                         />
                     </View>
 
@@ -207,6 +225,24 @@ export default function HomeScreen({ navigation }: any) {
                 </Animated.View>
 
             </ScrollView>
+
+            {/* TOOLTIP MODAL */}
+            <Modal visible={!!tooltip} transparent animationType="fade">
+                <TouchableWithoutFeedback onPress={() => setTooltip(null)}>
+                    <View style={styles.modalOverlay}>
+                        <TouchableWithoutFeedback>
+                            <View style={styles.tooltipBox}>
+                                <Text style={styles.tooltipTitle}>{tooltip?.title}</Text>
+                                <Text style={styles.tooltipText}>{tooltip?.content}</Text>
+                                <TouchableOpacity onPress={() => setTooltip(null)} style={styles.tooltipBtn} activeOpacity={0.8}>
+                                    <Text style={styles.tooltipBtnText}>ENTENDIDO</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
+
         </SafeAreaView>
     );
 }
@@ -239,6 +275,9 @@ const styles = StyleSheet.create({
 
     statusTitle: { fontSize: 20, fontWeight: '900', color: theme.colors.navy, letterSpacing: 1, marginBottom: 8 },
     statusDescription: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20 },
+
+    darkInfoIcon: { width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', marginTop: -2 },
+    darkInfoText: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.95)' },
 
     chipsGrid: { flexDirection: 'row', gap: 12, paddingHorizontal: 24, marginBottom: 40 },
 
@@ -292,5 +331,12 @@ const styles = StyleSheet.create({
     weatherInfo: { flex: 1 },
     weatherStatus: { fontSize: 13, fontWeight: '800', color: theme.colors.navy, marginBottom: 4 },
     weatherDesc: { fontSize: 12, color: theme.colors.textSecondary, lineHeight: 16 },
+
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    tooltipBox: { backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '100%', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.15, shadowRadius: 30, elevation: 10 },
+    tooltipTitle: { fontSize: 16, fontWeight: '900', color: theme.colors.navy, marginBottom: 12, letterSpacing: 0.5 },
+    tooltipText: { fontSize: 14, color: theme.colors.textSecondary, lineHeight: 22, marginBottom: 24 },
+    tooltipBtn: { backgroundColor: '#F1F5F9', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+    tooltipBtnText: { fontSize: 12, fontWeight: '800', color: theme.colors.navy, letterSpacing: 1.5 },
 });
 
