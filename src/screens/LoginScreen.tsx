@@ -33,7 +33,12 @@ export default function LoginScreen({ navigation }: any) {
         try {
             await signIn({ email: email.trim(), password });
         } catch (error: any) {
-            setErrors({ general: 'Error de autenticación. Verificá tus credenciales.' });
+            const errStr = String(error?.message || error);
+            if (errStr.includes("Network") || errStr.includes("Failed to fetch") || errStr.includes("JSON")) {
+                setErrors({ general: 'Error de Red: No se pudo contactar al servidor. Revisa tu Wi-Fi e IP.' });
+            } else {
+                setErrors({ general: 'Error de autenticación: Verifica tu correo y contraseña.' });
+            }
         } finally {
             setLoading(false);
         }

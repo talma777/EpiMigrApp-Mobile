@@ -37,11 +37,13 @@ export default function RegisterScreen({ navigation }: any) {
         try {
             await signUp({ email: email.trim(), password, role: 'PATIENT' });
         } catch (error: any) {
-            const msg = error.message || '';
-            if (msg.toLowerCase().includes('exist') || msg.toLowerCase().includes('already')) {
+            const errStr = String(error?.message || error);
+            if (errStr.includes("Network") || errStr.includes("Failed to fetch") || errStr.includes("JSON")) {
+                setErrors({ general: 'Error de Red: No se pudo conectar con el servidor central. Revise su conexión Wi-Fi.' });
+            } else if (errStr.toLowerCase().includes('exist') || errStr.toLowerCase().includes('already')) {
                 setErrors({ general: 'Este correo ya dispone de una ficha clínica activa.' });
             } else {
-                setErrors({ general: 'Error en el sistema de alta. Intente nuevamente.' });
+                setErrors({ general: `Error en el sistema de alta: ${errStr}` });
             }
         } finally {
             setLoading(false);
