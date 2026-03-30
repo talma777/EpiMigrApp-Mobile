@@ -13,13 +13,14 @@ interface DataChipProps {
     value: string | number;
     unit?: string;
     trend?: 'up' | 'down' | 'stable';
+    trendColor?: string;
     color?: string;
     style?: ViewStyle;
     onInfoPress?: () => void;
 }
 
 export const DataChip: React.FC<DataChipProps> = ({
-    label, value, unit, trend, color, style, onInfoPress
+    label, value, unit, trend, trendColor, color, style, onInfoPress
 }) => {
     const resolvedColor = color || theme.colors.navy;
 
@@ -39,10 +40,10 @@ export const DataChip: React.FC<DataChipProps> = ({
             </View>
             {trend && (
                 <View style={styles.trendRow}>
-                    <Text style={[styles.trendIcon, { color: trend === 'down' ? theme.colors.riskLow : theme.colors.riskHigh }]}>
+                    <Text style={[styles.trendIcon, { color: trendColor || (trend === 'stable' ? theme.colors.riskLow : theme.colors.riskHigh) }]}>
                         {trend === 'up' ? '▲' : trend === 'down' ? '▼' : '●'}
                     </Text>
-                    <Text style={styles.trendLabel}>{trend === 'stable' ? 'ESTABLE' : 'TENDENCIA'}</Text>
+                    <Text style={[styles.trendLabel, trendColor ? { color: trendColor } : {}]}>{trend === 'stable' ? 'ESTABLE' : 'TENDENCIA'}</Text>
                 </View>
             )}
         </View>

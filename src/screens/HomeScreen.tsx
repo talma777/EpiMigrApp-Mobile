@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { StyleSheet, Text, View, ActivityIndicator, TouchableOpacity, ScrollView, StatusBar, SafeAreaView, Animated, Dimensions, Modal, TouchableWithoutFeedback } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { biometrics, RiskAnalysis } from '../services/BiometricsService';
 import { theme, backendRiskToLevel } from '../theme';
@@ -65,11 +66,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={styles.topNav}>
                 <Logo size="sm" showClaim={true} />
                 <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.profileBtn}>
-                    <View style={styles.profileInitial}>
-                        <Text style={styles.profileText}>
-                            {state.email ? state.email[0].toUpperCase() : 'U'}
-                        </Text>
-                    </View>
+                    <Ionicons name="settings-outline" size={20} color={theme.colors.navy} />
                 </TouchableOpacity>
             </View>
 
@@ -87,22 +84,36 @@ export default function HomeScreen({ navigation }: any) {
                         <View style={styles.orbWrapper}>
                             <RiskOrb riskLevel={currentLevel === 'critical' ? 'high' : currentLevel} score={ci / 100} size="lg" />
                             <View style={styles.scoreOverlay}>
-                                <Text style={styles.scoreValue}>{ci}</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Text style={styles.scoreLabel}>CLINICAL INDEX</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                                    <Text style={styles.scoreLabel}>ÍNDICE CLÍNICO</Text>
                                     <TouchableOpacity onPress={() => setTooltip({
-                                        title: 'Clinical Index (CI)',
-                                        content: 'El CI es tu termómetro neurológico.\n\n🟢 Verde (0-30): Estable.\n🟡 Amarillo (31-70): Riesgo Moderado.\n🟠 Naranja (71-89): Monitoreo Alto.\n🔴 Rojo (90-100): Alerta inminente.'
+                                        title: 'Índice Clínico (CI)',
+                                        content: 'El valor cruza tu Biometría (Ritmo Cardíaco, Sudoración) y Clima para determinar fatiga neurológica.\n\n🟢 0-30: Normal.\n🟡 31-70: Precaución.\n🔴 71+: Riesgo / Alerta.'
                                     })} style={styles.darkInfoIcon}>
                                         <Text style={styles.darkInfoText}>?</Text>
                                     </TouchableOpacity>
                                 </View>
+                                <Text style={styles.scoreValue}>{ci}<Text style={styles.scorePercent}>%</Text></Text>
                             </View>
                         </View>
 
-                        <Text style={styles.statusTitle}>
-                            {currentLevel === 'critical' ? 'ALERTA CRÍTICA' : currentLevel === 'high' ? 'MONITOREO ALTO' : currentLevel === 'medium' ? 'RIESGO MODERADO' : 'ESTADO ESTABLE'}
-                        </Text>
+                        {/* SEMÁFORO EXPLICATIVO */}
+                        <View style={styles.trafficLightContainer}>
+                            <View style={{ width: '100%', position: 'relative', marginBottom: 8 }}>
+                                <View style={styles.trafficBar}>
+                                    <View style={[styles.trafficSegment, { backgroundColor: theme.colors.riskLow }]} />
+                                    <View style={[styles.trafficSegment, { backgroundColor: theme.colors.riskMedium }]} />
+                                    <View style={[styles.trafficSegment, { backgroundColor: theme.colors.danger }]} />
+                                </View>
+                                {/* Positional Marker */}
+                                <View style={[styles.trafficMarker, { left: `${Math.min(ci, 98)}%` }]} />
+                            </View>
+                            <View style={styles.trafficLabels}>
+                                <Text style={styles.trafficText}>Normal</Text>
+                                <Text style={styles.trafficText}>Precaución</Text>
+                                <Text style={styles.trafficText}>Riesgo</Text>
+                            </View>
+                        </View>
                     </View>
 
                     {/* BIOMETRIC GRID - Includes IPC and Lambda */}
@@ -111,7 +122,8 @@ export default function HomeScreen({ navigation }: any) {
                             label="Blindaje (IPC)"
                             value={ipc}
                             unit="%"
-                            trend={ipc > 70 ? 'up' : 'down'}
+                            trend={ipc > 70 ? 'stable' : 'down'}
+                            trendColor={ipc >= 70 ? theme.colors.riskLow : (ipc >= 40 ? theme.colors.riskMedium : theme.colors.danger)}
                             style={{ flex: 1 }}
                             onInfoPress={() => setTooltip({
                                 title: 'Índice de Protección Clínica',
@@ -119,14 +131,15 @@ export default function HomeScreen({ navigation }: any) {
                             })}
                         />
                         <DataChip
-                            label="Prob (λ)"
+                            label="Riesgo de Crisis"
                             value={lambda}
                             unit=""
                             trend={lambda > 0.3 ? 'up' : 'stable'}
+                            trendColor={lambda < 0.3 ? theme.colors.riskLow : (lambda < 0.6 ? theme.colors.riskMedium : theme.colors.danger)}
                             style={{ flex: 1 }}
                             onInfoPress={() => setTooltip({
-                                title: 'Probabilidad Matemática (λ)',
-                                content: 'Es la variable algorítmica de riesgo a corto plazo calculada por la I.A. Un valor mayor a 0.3 indica que tu riesgo está creciendo aceleradamente en este momento.'
+                                title: 'Riesgo de Crisis (λ)',
+                                content: 'Es la probabilidad algorítmica de riesgo a corto plazo calculada por la I.A. Un valor ascendente indica que tu riesgo está creciendo aceleradamente.'
                             })}
                         />
                         <DataChip
@@ -134,10 +147,11 @@ export default function HomeScreen({ navigation }: any) {
                             value={analysis?.factors?.find(f => f.signal.toLowerCase().includes('eda'))?.value || '1.1'}
                             unit="µS"
                             trend="stable"
+                            trendColor={theme.colors.riskLow}
                             style={{ flex: 1 }}
                             onInfoPress={() => setTooltip({
                                 title: 'Carga Alostática (Estrés)',
-                                content: 'Nivel de actividad actual de tu sistema nervioso simpático, inferido de tu biometría. Valores altos constantes revelan estrés fisiológico que desgasta tu blindaje.'
+                                content: 'Nivel de actividad actual de tu sistema nervioso simpático, inferido de tu biometría.\n\n🟢 < 5 µS: Nivel Normal\n🟡 5 - 15 µS: Estrés Intermedio\n🔴 > 15 µS: Estrés Peligroso'
                             })}
                         />
                     </View>
@@ -268,16 +282,21 @@ const styles = StyleSheet.create({
     liveWrapper: { alignSelf: 'center', marginBottom: 24 },
 
     heroSection: { alignItems: 'center', paddingHorizontal: 32, marginBottom: 40 },
-    orbWrapper: { width: 220, height: 220, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-    scoreOverlay: { position: 'absolute', alignItems: 'center' },
-    scoreValue: { fontSize: 56, fontWeight: '900', color: '#fff', letterSpacing: -2 },
-    scoreLabel: { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.6)', letterSpacing: 1.5 },
+    orbWrapper: { width: 220, height: 220, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+    scoreOverlay: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+    scoreValue: { fontSize: 44, fontWeight: '900', color: '#fff', letterSpacing: -2, includeFontPadding: false },
+    scorePercent: { fontSize: 18, fontWeight: '700', color: 'rgba(255,255,255,0.7)', letterSpacing: 0 },
+    scoreLabel: { fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.8)', letterSpacing: 2 },
 
-    statusTitle: { fontSize: 20, fontWeight: '900', color: theme.colors.navy, letterSpacing: 1, marginBottom: 8 },
-    statusDescription: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20 },
+    darkInfoIcon: { width: 16, height: 16, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', marginTop: -2 },
+    darkInfoText: { fontSize: 10, fontWeight: '900', color: 'rgba(255,255,255,0.95)' },
 
-    darkInfoIcon: { width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', marginTop: -2 },
-    darkInfoText: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.95)' },
+    trafficLightContainer: { width: '85%', marginTop: 8, alignItems: 'center' },
+    trafficBar: { flexDirection: 'row', width: '100%', height: 6, borderRadius: 3, overflow: 'hidden' },
+    trafficSegment: { flex: 1 },
+    trafficMarker: { position: 'absolute', width: 6, height: 12, top: -3, backgroundColor: theme.colors.navy, borderRadius: 3, borderWidth: 1.5, borderColor: '#fff', marginLeft: -3 },
+    trafficLabels: { flexDirection: 'row', width: '100%', justifyContent: 'space-between', paddingHorizontal: 4 },
+    trafficText: { fontSize: 11, fontWeight: '700', color: theme.colors.textMuted, letterSpacing: 0.5 },
 
     chipsGrid: { flexDirection: 'row', gap: 12, paddingHorizontal: 24, marginBottom: 40 },
 

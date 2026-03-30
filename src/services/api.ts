@@ -1,7 +1,7 @@
 import { storage } from './storage';
 
 // URL DE DESARROLLO LOCAL
-const API_URL = 'http://192.168.86.128:3005';
+const API_URL = 'http://192.168.1.80:3005';
 
 export const getAuthToken = async () => {
     try {

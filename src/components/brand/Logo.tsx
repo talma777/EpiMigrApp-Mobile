@@ -22,7 +22,7 @@ interface LogoProps {
 }
 
 const SIZES = {
-    sm: { height: 24, width: 120 },
+    sm: { height: 34, width: 160 },
     md: { height: 60, width: 250 },
     lg: { height: 100, width: 400 },
     xl: { height: 160, width: 600 },
